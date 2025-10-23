@@ -79,6 +79,37 @@ jobs:
       - name: Make report directories
         run: mkdir -p reports/htmlcov reports/junit
 
+        # Add this step BEFORE "Run tests"
+      - name: Bootstrap DB schema (create tables)
+        run: |
+          . .venv/bin/activate
+          python - <<'PY'
+          import asyncio
+          import os
+          # ensure CI uses Postgres service URL
+          print("DB URL:", os.getenv("DATABASE_URL"))
+          try:
+            # Try async engine first (most modern templates)
+            from app.db.session import async_engine as engine
+            from app.db.base import SQLModel
+            async def _create_all():
+              async with engine.begin() as conn:
+                await conn.run_sync(SQLModel.metadata.create_all)
+            asyncio.run(_create_all())
+            print("✅ Created tables with async engine")
+          except Exception as e1:
+            print("Async create_all failed, trying sync:", e1)
+            try:
+              # Fallback to sync engine
+              from app.db.session import engine
+              from app.db.base import SQLModel
+              SQLModel.metadata.create_all(engine)
+              print("✅ Created tables with sync engine")
+            except Exception as e2:
+              print("❌ Could not create tables:", e2)
+              raise
+          PY
+
       - name: Run tests
         run: |
           . .venv/bin/activate
