@@ -9,8 +9,33 @@ jobs:
       run:
         working-directory: backend
     env:
-      # Make "import app" work without installing the package
       PYTHONPATH: .
+      # point the app to the CI postgres service
+      POSTGRES_SERVER: localhost
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: app
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      # pick one depending on your app driver (most templates use psycopg or asyncpg)
+      DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/app
+      # If your code expects async URL, add this too:
+      DATABASE_ASYNC_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/app
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: app
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d app"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+          
     steps:
       - uses: actions/checkout@v4
 
