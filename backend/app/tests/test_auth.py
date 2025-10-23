@@ -2,9 +2,9 @@ def test_login_success(client):
     email = "a@ex.com"
     password = "Secret123!"
 
-    # ✅ open registration does not require auth
-    r_create = client.post("/api/v1/users/open", json={"email": email, "password": password})
-    assert r_create.status_code in (200, 201), r_create.text
+    # Seed directly in DB (no HTTP signup needed)
+    from app.tests.conftest import seed_user  # or relative import if different
+    seed_user(email, password, superuser=False)
 
     r_login = client.post(
         "/api/v1/login/access-token",
