@@ -51,7 +51,7 @@ def client():
 def auth_headers(client):
     email = "u@example.com"
     password = "Secret123!"
-    client.post("/api/v1/users/", json={"email": email, "password": password})
+    client.post("/api/v1/users/open", json={"email": email, "password": password})
     r = client.post(
         "/api/v1/login/access-token",
         data={"username": email, "password": password, "grant_type": "password", "scope": ""},
