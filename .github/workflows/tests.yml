@@ -8,21 +8,65 @@ jobs:
     defaults:
       run:
         working-directory: backend
+    env:
+      # Make "import app" work without installing the package
+      PYTHONPATH: .
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+
+      - name: Set up Python (use a stable version)
+        uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - run: python -m venv .venv
-      - run: . .venv/bin/activate && pip install -e .
-      - run: . .venv/bin/activate && pip install pytest pytest-cov httpx aiosqlite PyJWT
-      - run: mkdir -p reports/htmlcov reports/junit
-      - run: . .venv/bin/activate && pytest
-      - uses: actions/upload-artifact@v4
+
+      - name: Create venv and upgrade tooling
+        run: |
+          python -m venv .venv
+          . .venv/bin/activate
+          python -m pip install --upgrade pip setuptools wheel
+
+      # IMPORTANT: Don't run "pip install -e ."
+      # Install only the runtime/test deps needed for the app and tests.
+      - name: Install runtime + test dependencies (no editable install)
+        run: |
+          . .venv/bin/activate
+          # ensure correct JWT lib; remove wrong "jwt" if present
+          pip uninstall -y jwt || true
+          pip install \
+            fastapi \
+            "pydantic>=2,<3" \
+            pydantic-settings \
+            sqlmodel \
+            "sqlalchemy>=2" \
+            "uvicorn[standard]" \
+            httpx \
+            aiosqlite \
+            PyJWT \
+            passlib bcrypt \
+            python-multipart \
+            email-validator \
+            pytest pytest-cov
+
+      - name: Make report directories
+        run: mkdir -p reports/htmlcov reports/junit
+
+      - name: Run tests
+        run: |
+          . .venv/bin/activate
+          pytest -q --maxfail=1 \
+            --cov=app \
+            --cov-report=term-missing:skip-covered \
+            --cov-report=html:reports/htmlcov \
+            --junitxml=reports/junit/junit.xml
+
+      - name: Upload coverage HTML
+        uses: actions/upload-artifact@v4
         with:
           name: backend-coverage
           path: backend/reports/htmlcov
-      - uses: actions/upload-artifact@v4
+
+      - name: Upload JUnit XML
+        uses: actions/upload-artifact@v4
         with:
           name: backend-junit
           path: backend/reports/junit/junit.xml
