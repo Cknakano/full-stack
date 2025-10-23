@@ -23,6 +23,17 @@ dependencies = [
     "pyjwt<3.0.0,>=2.8.0",
 ]
 
+[tool.pytest.ini_options]
+addopts = """
+  -q
+  --maxfail=1
+  --cov=app
+  --cov-report=term-missing:skip-covered
+  --cov-report=html:reports/htmlcov
+  --junitxml=reports/junit/junit.xml
+"""
+testpaths = ["app/tests"]
+
 [tool.uv]
 dev-dependencies = [
     "pytest<8.0.0,>=7.4.3",
