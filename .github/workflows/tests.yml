@@ -48,6 +48,7 @@ jobs:
             sentry-sdk \
             "psycopg[binary]" \
             emails \
+            jinja2 \
             pytest pytest-cov
 
       - name: Make report directories
