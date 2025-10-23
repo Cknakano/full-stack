@@ -1,0 +1,28 @@
+name: CI
+
+on: [push, pull_request, workflow_dispatch]
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m venv .venv
+      - run: . .venv/bin/activate && pip install -e .
+      - run: . .venv/bin/activate && pip install pytest pytest-cov httpx aiosqlite PyJWT
+      - run: mkdir -p reports/htmlcov reports/junit
+      - run: . .venv/bin/activate && pytest
+      - uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage
+          path: backend/reports/htmlcov
+      - uses: actions/upload-artifact@v4
+        with:
+          name: backend-junit
+          path: backend/reports/junit/junit.xml
