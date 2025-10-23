@@ -47,14 +47,89 @@ def client():
     with TestClient(app) as c:
         yield c
 
+# ---- DB seeding helpers (add to conftest.py) ----
+from typing import Optional
+
+def _hash_pw(pw: str) -> str:
+    from app.core import security
+    return security.get_password_hash(pw)
+
+async def _async_seed_user(email: str, password: str, *, superuser=False) -> None:
+    # Async engine/session path
+    from sqlmodel import SQLModel
+    from sqlalchemy.ext.asyncio import AsyncSession
+    from sqlalchemy.orm import sessionmaker
+    from app.db.session import async_engine as engine
+    from app.models.user import User
+
+    async with engine.begin() as conn:
+        # create tables if not already present (idempotent)
+        await conn.run_sync(SQLModel.metadata.create_all)
+
+    async_session = sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
+    async with async_session() as session:
+        # avoid duplicates
+        existing = (await session.execute(
+            User.__table__.select().where(User.email == email)
+        )).first()
+        if not existing:
+            user = User(
+                email=email,
+                hashed_password=_hash_pw(password),
+                is_active=True,
+                is_superuser=bool(superuser),
+                full_name="Test User",
+            )
+            session.add(user)
+            await session.commit()
+
+def _sync_seed_user(email: str, password: str, *, superuser=False) -> None:
+    # Sync engine/session path
+    from sqlmodel import SQLModel, Session
+    from app.db.session import engine
+    from app.models.user import User
+
+    SQLModel.metadata.create_all(engine)  # idempotent
+    with Session(engine) as session:
+        existing = session.exec(User.select().where(User.email == email)).first()
+        if not existing:
+            user = User(
+                email=email,
+                hashed_password=_hash_pw(password),
+                is_active=True,
+                is_superuser=bool(superuser),
+                full_name="Test User",
+            )
+            session.add(user)
+            session.commit()
+
+def seed_user(email: str, password: str, *, superuser: bool = False) -> None:
+    """Seed a user, regardless of async/sync engine."""
+    try:
+        # try async engine path
+        from app.db.session import async_engine as _  # just to detect availability
+        asyncio.get_event_loop().run_until_complete(
+            _async_seed_user(email, password, superuser=superuser)
+        )
+    except Exception:
+        # fallback to sync engine path
+        _sync_seed_user(email, password, superuser=superuser)
+# ---- end DB seeding helpers ----
+
 @pytest.fixture
 def auth_headers(client):
     email = "u@example.com"
     password = "Secret123!"
-    client.post("/api/v1/users/open", json={"email": email, "password": password})
+    seed_user(email, password, superuser=False)
+
     r = client.post(
         "/api/v1/login/access-token",
-        data={"username": email, "password": password, "grant_type": "password", "scope": ""},
+        data={
+            "username": email,
+            "password": password,
+            "grant_type": "password",
+            "scope": "",
+        },
         headers={"Content-Type": "application/x-www-form-urlencoded"},
     )
     assert r.status_code == 200, r.text
