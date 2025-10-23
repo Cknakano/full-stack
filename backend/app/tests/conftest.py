@@ -49,11 +49,14 @@ def client():
 
 @pytest.fixture
 def auth_headers(client):
-    # register user
-    client.post("/api/v1/users/", json={"email":"u@example.com","password":"secret"})
-    # login
-    r = client.post("/api/v1/login/access-token",
-                    data={"username":"u@example.com","password":"secret"})
+    email = "u@example.com"
+    password = "Secret123!"
+    client.post("/api/v1/users/", json={"email": email, "password": password})
+    r = client.post(
+        "/api/v1/login/access-token",
+        data={"username": email, "password": password, "grant_type": "password", "scope": ""},
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+    )
     assert r.status_code == 200, r.text
-    token = r.json().get("access_token")
-    return {"Authorization": f"Bearer {token}"} if token else {}
+    token = r.json()["access_token"]
+    return {"Authorization": f"Bearer {token}"}
