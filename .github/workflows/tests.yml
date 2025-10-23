@@ -45,6 +45,7 @@ jobs:
             passlib bcrypt \
             python-multipart \
             email-validator \
+            sentry-sdk \
             pytest pytest-cov
 
       - name: Make report directories
