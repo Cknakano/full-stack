@@ -9,16 +9,14 @@ jobs:
       run:
         working-directory: backend
     env:
-      PYTHONPATH: .
-      # point the app to the CI postgres service
+      PYTHONPATH: ${{ github.workspace }}/backend   # ← set absolute path to backend
+      # your DB env stays here too (if using Postgres service)
       POSTGRES_SERVER: localhost
       POSTGRES_PORT: "5432"
       POSTGRES_DB: app
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-      # pick one depending on your app driver (most templates use psycopg or asyncpg)
       DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/app
-      # If your code expects async URL, add this too:
       DATABASE_ASYNC_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/app
 
     services:
@@ -74,41 +72,17 @@ jobs:
             "psycopg[binary]" \
             emails \
             jinja2 \
+            alembic \
             pytest pytest-cov
 
       - name: Make report directories
         run: mkdir -p reports/htmlcov reports/junit
 
-        # Add this step BEFORE "Run tests"
-      - name: Bootstrap DB schema (create tables)
+      - name: Run Alembic migrations
         run: |
           . .venv/bin/activate
-          python - <<'PY'
-          import asyncio
-          import os
-          # ensure CI uses Postgres service URL
-          print("DB URL:", os.getenv("DATABASE_URL"))
-          try:
-            # Try async engine first (most modern templates)
-            from app.db.session import async_engine as engine
-            from app.db.base import SQLModel
-            async def _create_all():
-              async with engine.begin() as conn:
-                await conn.run_sync(SQLModel.metadata.create_all)
-            asyncio.run(_create_all())
-            print("✅ Created tables with async engine")
-          except Exception as e1:
-            print("Async create_all failed, trying sync:", e1)
-            try:
-              # Fallback to sync engine
-              from app.db.session import engine
-              from app.db.base import SQLModel
-              SQLModel.metadata.create_all(engine)
-              print("✅ Created tables with sync engine")
-            except Exception as e2:
-              print("❌ Could not create tables:", e2)
-              raise
-          PY
+          if [ -f "alembic.ini" ]; then alembic upgrade head; fi
+
 
       - name: Run tests
         run: |
