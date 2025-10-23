@@ -47,6 +47,7 @@ jobs:
             email-validator \
             sentry-sdk \
             "psycopg[binary]" \
+            emails \
             pytest pytest-cov
 
       - name: Make report directories
